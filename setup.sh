@@ -20,11 +20,9 @@ wget -O sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/latest/dow
 tar -xzf sing-box.tar.gz
 mv sing-box-*/sing-box /usr/local/bin/
 chmod +x /usr/local/bin/sing-box
-
 # ساخت پوشه فیلتر و اسکریپت پایتون
 mkdir -p ~/v2ray-filter
 cd ~/v2ray-filter
-
 cat > filter.py << 'EOF'
 import requests, subprocess, base64
 
@@ -52,11 +50,9 @@ print(f"\n✅ {len(good_configs)} valid configs saved to subscription.txt")
 print("🌐 Your subscription link:")
 print("http://YOUR_SERVER_IP:8000/subscription.txt")
 EOF
-
 # راه‌اندازی وب سرور
 cd ~/v2ray-filter
 nohup python3 -m http.server 8000 > /dev/null 2>&1 &
-
 echo -e "\n✅ نصب کامل شد!"
 echo "📂 مسیر اسکریپت: ~/v2ray-filter/filter.py"
 echo "🟢 اجرا: cd ~/v2ray-filter && python3 filter.py"
