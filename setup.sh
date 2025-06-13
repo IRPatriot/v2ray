@@ -1,59 +1,86 @@
 #!/bin/bash
 
 # نصب ابزارهای لازم
-apt update && apt install -y wget unzip curl python3
+apt update && apt install curl wget unzip python3 python3-pip -y
 
 # نصب subconverter
 cd /opt
 wget -O subconverter.zip https://github.com/tindy2013/subconverter/releases/latest/download/subconverter_linux64.zip
-unzip subconverter.zip -d subconverter
+unzip subconverter.zip
 cd subconverter
-echo -e "[general]\nlisten = 0.0.0.0\nport = 25500" > pref.ini
 chmod +x subconverter
 
-# اجرای subconverter در بک‌گراند
+# اجرای subconverter در پس‌زمینه
 nohup ./subconverter > /dev/null 2>&1 &
 
 # نصب sing-box
 cd /opt
 wget -O sing-box.tar.gz https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
 tar -xzf sing-box.tar.gz
-mv sing-box-*/sing-box /usr/local/bin/
+mv sing-box-*/sing-box /usr/local/bin/sing-box
 chmod +x /usr/local/bin/sing-box
-# ساخت پوشه فیلتر و اسکریپت پایتون
+
+# نصب اسکریپت تست و فیلتر
 mkdir -p ~/v2ray-filter
-cd ~/v2ray-filter
-cat > filter.py << 'EOF'
-import requests, subprocess, base64
+cat > ~/v2ray-filter/filter.py << 'EOF'
+import requests
+import subprocess
+import os
+import http.server
+import socketserver
 
-SUB_LINK = input("🔗 Enter your subscription link: ").strip()
-
-b64 = requests.get(SUB_LINK).text.strip()
-configs = base64.b64decode(b64).decode().splitlines()
-
-good_configs = []
-
-for idx, config in enumerate(configs):
-    print(f"[{idx+1}/{len(configs)}] Testing...")
+def test_config(link):
     try:
-        result = subprocess.run(['sing-box', 'run', '--check', '--url', config],
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
-        if result.returncode == 0:
-            good_configs.append(config)
+        r = requests.get(link, timeout=10)
+        if r.status_code == 200 and len(r.text) > 100:
+            return True
     except:
-        pass
+        return False
+    return False
 
-with open("subscription.txt", "w") as f:
-    f.write(base64.b64encode('\n'.join(good_configs).encode()).decode())
+def main():
+    url = input("Enter your subscription link: ").strip()
+    if not url:
+        print("No URL provided")
+        return
 
-print(f"\n✅ {len(good_configs)} valid configs saved to subscription.txt")
-print("🌐 Your subscription link:")
-print("http://YOUR_SERVER_IP:8000/subscription.txt")
+    print("Fetching configs...")
+    try:
+        response = requests.get(f"http://localhost:25500/sub?target=singbox&url={url}")
+        if response.status_code != 200:
+            print("Failed to fetch from subconverter")
+            return
+    except Exception as e:
+        print("Error:", e)
+        return
+
+    lines = response.text.splitlines()
+    valid = []
+    print("Testing configs...")
+
+    for line in lines:
+        if test_config(line):
+            valid.append(line)
+
+    with open("subscription.txt", "w") as f:
+        f.write('\n'.join(valid))
+
+    print(f"{len(valid)} valid configs saved to subscription.txt")
+
+    PORT = 8000
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", PORT), handler) as httpd:
+        print(f"Serving subscription at http://YOUR_SERVER_IP:{PORT}/subscription.txt")
+        httpd.serve_forever()
+
+if __name__ == "__main__":
+    main()
 EOF
-# راه‌اندازی وب سرور
-cd ~/v2ray-filter
-nohup python3 -m http.server 8000 > /dev/null 2>&1 &
-echo -e "\n✅ نصب کامل شد!"
+
+chmod +x ~/v2ray-filter/filter.py
+
+echo ""
+echo "✅  نصب کامل شد!"
 echo "📂 مسیر اسکریپت: ~/v2ray-filter/filter.py"
 echo "🟢 اجرا: cd ~/v2ray-filter && python3 filter.py"
 echo "🌐 آدرس نهایی فایل subscription بعد از تست:"
